@@ -3,7 +3,7 @@
         <vertical horizontal-fit="PreferredSize" vertical-fit="PreferredSize" pref-width="90" pref-height="50" spacing="2">
             <text text="I just set a score! Where is it?" bold="true" font-align="Center" font-size="7" />
             <text
-                    text="AccSaber's backend works by periodically fetching new scores from ScoreSaber, so your scores may not appear instantly.&lt;br&gt;Check back on this leaderboard after playing a few more songs, or view your scores on the AccSaber website at the end of your session!"
+                    text="AccSaber Reloaded processes score updates asynchronously, so your score may not appear instantly.&lt;br&gt;Check back on this leaderboard in a few minutes after your play."
                     word-wrapping="true" 
                     align="Center"
             />

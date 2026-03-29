@@ -11,7 +11,6 @@ Minimum runtime dependencies for this branch:
 * `SiraUtil` `3.2.1+`
 * `LeaderboardCore` `1.7.0+`
 * `SongCore` `3.15.3+`
-* `ScoreSaber` `3.3.17+`
 
 ## Current Behavior
 * The AccSaber tab stays visible even when the selected map is not ranked on AccSaber Reloaded.

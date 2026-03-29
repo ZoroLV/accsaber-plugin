@@ -1,6 +1,5 @@
-﻿using System;
-using AccSaber.Managers;
-using AccSaber.Models;
+using System;
+using System.Threading.Tasks;
 using AccSaber.UI.ViewControllers;
 using HMUI;
 using LeaderboardCore.Managers;
@@ -11,14 +10,13 @@ namespace AccSaber.UI
 {
 	internal sealed class AccSaberCustomLeaderboard : CustomLeaderboard, IInitializable, IDisposable
 	{
-		private readonly AccSaberStore _accSaberStore;
 		private readonly CustomLeaderboardManager _customLeaderboardManager;
 		private readonly AccSaberPanelViewController _accSaberPanelViewController;
 		private readonly AccSaberLeaderboardViewController _accSaberLeaderboardViewController;
+		private bool _disposed;
 
-		public AccSaberCustomLeaderboard(AccSaberStore accSaberStore, CustomLeaderboardManager customLeaderboardManager, AccSaberPanelViewController accSaberPanelViewController, AccSaberLeaderboardViewController accSaberLeaderboardViewController)
+		public AccSaberCustomLeaderboard(CustomLeaderboardManager customLeaderboardManager, AccSaberPanelViewController accSaberPanelViewController, AccSaberLeaderboardViewController accSaberLeaderboardViewController)
 		{
-			_accSaberStore = accSaberStore;
 			_customLeaderboardManager = customLeaderboardManager;
 			_accSaberPanelViewController = accSaberPanelViewController;
 			_accSaberLeaderboardViewController = accSaberLeaderboardViewController;
@@ -27,26 +25,23 @@ namespace AccSaber.UI
 		protected override ViewController panelViewController => _accSaberPanelViewController;
 		protected override ViewController leaderboardViewController => _accSaberLeaderboardViewController;
 
-		public void Initialize()
+		public async void Initialize()
 		{
-			_accSaberStore.OnAccSaberRankedMapUpdated += AccSaberStoreOnOnAccSaberRankedMapUpdated; 
+			// LeaderboardCore tab order follows registration timing, so register slightly
+			// after the other built-in leaderboard plugins to keep AccSaber later in the row.
+			await Task.Delay(1500);
+			if (_disposed)
+			{
+				return;
+			}
+
+			_customLeaderboardManager.Register(this);
 		}
 
 		public void Dispose()
 		{
+			_disposed = true;
 			_customLeaderboardManager.Unregister(this);
-		}
-
-		private void AccSaberStoreOnOnAccSaberRankedMapUpdated(AccSaberRankedMap? accSaberMapInfo)
-		{
-			if (accSaberMapInfo is not null)
-			{
-				_customLeaderboardManager.Register(this);
-			}
-			else
-			{
-				_customLeaderboardManager.Unregister(this);
-			}
 		}
 	}
 }

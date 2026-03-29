@@ -44,14 +44,27 @@ namespace AccSaber.UI.ViewControllers
         
 		private void AccSaberStoreOnOnAccSaberRankedMapUpdated(AccSaberRankedMap? mapInfo)
 		{
-			if (mapInfo is null || !_parsed)
+			if (!_parsed)
 			{
 				return;
 			}
             
 			NotifyPropertyChanged(nameof(CategoryRankingText));
 			NotifyPropertyChanged(nameof(MapComplexityText));
-			
+
+			if (mapInfo is null)
+			{
+				SetUnavailablePromptText();
+				if (!_pluginConfig.RainbowHeader)
+				{
+					SetBannerColor(string.Empty);
+				}
+
+				return;
+			}
+
+			SetTimeSinceLastLeaderboardUpdateText();
+
 			if (_pluginConfig.RainbowHeader)
 			{
 				return;
@@ -70,7 +83,7 @@ namespace AccSaber.UI.ViewControllers
 		private void AccSaberStoreOnOnUpdatingFromAccSaberAPI()
 		{
 			LoadingActive = true;
-			PromptText = "<color=#00FF00>Updating leaderboard...</color>";
+			PromptText = "<color=#00FF00>Updating AccSaber data...</color>";
 		}
 
 		private void AccSaberStoreOnOnUpdatedFromAccSaberAPI(bool isNew)
@@ -82,7 +95,7 @@ namespace AccSaber.UI.ViewControllers
 			}
 			else
 			{
-				PromptText = "";
+				SetTimeSinceLastLeaderboardUpdateText();
 			}
 			
 			LoadingActive = false;
@@ -202,8 +215,25 @@ namespace AccSaber.UI.ViewControllers
 			};
 		}
 
+		private void SetUnavailablePromptText()
+		{
+			PromptText = "<color=#FFD42A>This map is not ranked on AccSaber Reloaded.</color>";
+		}
+
 		private void SetTimeSinceLastLeaderboardUpdateText()
 		{
+			if (_accSaberStore.CurrentRankedMap is null)
+			{
+				SetUnavailablePromptText();
+				return;
+			}
+
+			if (_accSaberStore.LastLocalUpdateTime == DateTime.MinValue)
+			{
+				PromptText = "<color=#7D7D7D>AccSaber data has not been refreshed yet</color>";
+				return;
+			}
+
 			string displayText;
 			var timeSinceUpdate = DateTime.UtcNow - _accSaberStore.LastLocalUpdateTime;
 			
@@ -218,7 +248,7 @@ namespace AccSaber.UI.ViewControllers
 				displayText = totalSeconds == 1 ? "1 second" : $"{totalSeconds} seconds";
 			}
 			
-			PromptText = $"<color=#7D7D7D>Leaderboard last updated {displayText} ago</color>";
+			PromptText = $"<color=#7D7D7D>AccSaber data refreshed {displayText} ago</color>";
 		}
 
 		[UIAction("#post-parse")]
@@ -277,9 +307,28 @@ namespace AccSaber.UI.ViewControllers
 
 		[UIValue("category-ranking-text")]
 		private string CategoryRankingText =>
-			$"<color=#EDFF55>Category Ranking:</color> #{_accSaberStore.GetCurrentCategoryUser().Rank} <size=75%>(<color=#00FFAE>{_accSaberStore.GetCurrentCategoryUser().AP:N2} AP</color>)";
+			_accSaberStore.CurrentRankedMap is null
+				? "<color=#EDFF55>Status:</color> Not ranked on AccSaber Reloaded"
+				: GetRankText();
         
 		[UIValue("map-complexity-text")]
-		private string MapComplexityText => $"<color=#EDFF55>Map Complexity:</color> {Math.Round(_accSaberStore.CurrentRankedMap!.Complexity, 2)}";
+		private string MapComplexityText =>
+			_accSaberStore.CurrentRankedMap is null
+				? "<color=#EDFF55>Hint:</color> Try a map that is ranked on AccSaber Reloaded"
+				: $"<color=#EDFF55>Map Complexity:</color> {Math.Round(_accSaberStore.CurrentRankedMap.Complexity, 2)}";
+
+		private string GetRankText()
+		{
+			var overallUser = _accSaberStore.GetCurrentOverallUser();
+			var categoryUser = _accSaberStore.GetCurrentCategoryUser();
+			var categoryName = _accSaberStore.CurrentRankedMap?.CategoryDisplayName ?? "Category";
+
+			return $"<color=#EDFF55>Rank:</color> Overall {FormatRank(overallUser.Rank)} • {categoryName} {FormatRank(categoryUser.Rank)}";
+		}
+
+		private static string FormatRank(int rank)
+		{
+			return rank > 0 ? $"#{rank}" : "--";
+		}
 	}
 }

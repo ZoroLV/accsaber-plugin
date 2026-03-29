@@ -1,9 +1,10 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using AccSaber.Managers;
 using AccSaber.Models;
+using AccSaber.Models.Reloaded;
 using AccSaber.Utils;
 using UnityEngine;
 
@@ -12,7 +13,7 @@ namespace AccSaber.LeaderboardSources
 	internal sealed class AroundMeLeaderboardSource : ILeaderboardSource
 	{
 		private readonly List<List<AccSaberLeaderboardEntry>> _cachedEntries = new();
-		
+
 		private readonly WebUtils _webUtils;
 		private readonly AccSaberStore _accSaberStore;
 
@@ -21,11 +22,11 @@ namespace AccSaber.LeaderboardSources
 			_webUtils = webUtils;
 			_accSaberStore = accSaberStore;
 		}
-		
+
 		public string HoverHint => "Around Me";
 
 		public Task<Sprite> Icon => BeatSaberMarkupLanguage.Utilities.LoadSpriteFromAssemblyAsync("AccSaber.Resources.PlayerIcon.png");
-		
+
 		public bool Scrollable => false;
 		public async Task<List<AccSaberLeaderboardEntry>?> GetScoresAsync(AccSaberRankedMap rankedMap, CancellationToken cancellationToken = default, int page = 0)
 		{
@@ -39,20 +40,39 @@ namespace AccSaber.LeaderboardSources
 			{
 				return null;
 			}
-			
-			var response = await _webUtils.GetAsync<List<AccSaberLeaderboardEntry>>($"https://api.accsaber.com/map-leaderboards/{rankedMap.SongHash}/standard/{rankedMap.Difficulty}/around/{userInfo.platformUserId}", cancellationToken);
-			if (response is null)
+
+			AccSaberReloadedScoresAroundResponse? response = null;
+			foreach (var leaderboardId in rankedMap.GetLeaderboardIds())
 			{
-				return null;
+				response = await _webUtils.GetAsync<AccSaberReloadedScoresAroundResponse>(
+					AccSaberReloadedApi.GetScoresAround(leaderboardId, userInfo.platformUserId),
+					cancellationToken,
+					allowNotFound: true);
+				if (response is not null)
+				{
+					break;
+				}
 			}
 
-			_cachedEntries.Add(response);
-			return response;
+			if (response?.PlayerScore is null)
+			{
+				return new List<AccSaberLeaderboardEntry>();
+			}
+
+			var mappedScores = response.ScoresAbove
+				.Concat(new[] { response.PlayerScore })
+				.Concat(response.ScoresBelow)
+				.Select(AccSaberLeaderboardEntry.FromReloaded)
+				.OrderBy(x => x.Rank)
+				.ToList();
+
+			_cachedEntries.Add(mappedScores);
+			return mappedScores;
 		}
-		
+
 		public List<AccSaberLeaderboardEntry>? GetCachedScore(int page)
 		{
-			return _cachedEntries[page];
+			return page >= 0 && page < _cachedEntries.Count ? _cachedEntries[page] : null;
 		}
 
 		public List<AccSaberLeaderboardEntry>? GetLatestCachedScore()

@@ -11,8 +11,8 @@
                     <text text="~username" font-size="5" bold="true"/>
                     <text text="~rank"/>
                     <text text="~ap"/>
+                    <text text="~average-stats"/>
                     <text text="~plays"/>
-                    <text text="~headset"/>
                 </vertical>
             </horizontal>
         </vertical>

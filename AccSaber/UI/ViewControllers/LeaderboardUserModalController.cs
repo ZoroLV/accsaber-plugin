@@ -34,7 +34,7 @@ namespace AccSaber.UI.ViewControllers
 		private string _rank = null!;
 		private string _ap = null!;
 		private string _plays = null!;
-		private string _headset = null!;
+		private string _averageStats = null!;
 		
 		public event PropertyChangedEventHandler? PropertyChanged;
 		
@@ -140,14 +140,14 @@ namespace AccSaber.UI.ViewControllers
 			}
 		}
 		
-		[UIValue("headset")]
-		private string Headset
+		[UIValue("average-stats")]
+		private string AverageStats
 		{
-			get => _headset;
+			get => _averageStats;
 			set
 			{
-				_headset = value;
-				PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Headset)));
+				_averageStats = value;
+				PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AverageStats)));
 			}
 		}
 		
@@ -316,8 +316,10 @@ namespace AccSaber.UI.ViewControllers
 			Username = userInfo.PlayerName;
 			Rank = $"#{userInfo.Rank}";
 			Ap = $"{userInfo.AP:N2} AP";
-			Plays = $"{userInfo.RankedPlays} ranked plays";
-			Headset = userInfo.Hmd ?? "";
+			AverageStats = userInfo.RankedPlays > 0
+				? $"{userInfo.AverageAcc * 100:F2}% avg acc"
+				: "No ranked plays in this category";
+			Plays = BuildDetailsText(userInfo);
 
 			if (_firstLoad)
 			{
@@ -337,6 +339,22 @@ namespace AccSaber.UI.ViewControllers
 				var tween = new FloatTween(0f, 1f, val => _userInfoCanvasGroup.alpha = val, 0.5f, EaseType.OutSine);
 				_timeTweeningManager.AddTween(tween, this);
 			}
+		}
+
+		private static string BuildDetailsText(AccSaberUser userInfo)
+		{
+			var details = new List<string> { $"{userInfo.RankedPlays} ranked plays" };
+			if (!string.IsNullOrWhiteSpace(userInfo.Country))
+			{
+				details.Add(userInfo.Country);
+			}
+
+			if (!string.IsNullOrWhiteSpace(userInfo.Hmd))
+			{
+				details.Add(userInfo.Hmd);
+			}
+
+			return string.Join(" • ", details);
 		}
 
 		private void OnModalClosed()

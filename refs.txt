@@ -1,14 +1,30 @@
 ::from ./bsinstalldir.txt
 "Beat Saber_Data/Managed/
 ""Main.dll?virt?alias=Beat Saber_Data\Managed\Main.dll
+""BeatmapCore.dll?alias=Beat Saber_Data\Managed\BeatmapCore.dll
+""BeatSaber.ViewSystem.dll?alias=Beat Saber_Data\Managed\BeatSaber.ViewSystem.dll
+""DataModels.dll?alias=Beat Saber_Data\Managed\DataModels.dll
+""HMLib.dll?alias=Beat Saber_Data\Managed\HMLib.dll
+""HMUI.dll?alias=Beat Saber_Data\Managed\HMUI.dll
+""Interactable.dll?alias=Beat Saber_Data\Managed\Interactable.dll
+""PlatformUserModel.dll?alias=Beat Saber_Data\Managed\PlatformUserModel.dll
+""SegmentedControl.dll?alias=Beat Saber_Data\Managed\SegmentedControl.dll
+""Tweening.dll?alias=Beat Saber_Data\Managed\Tweening.dll
+""Unity.TextMeshPro.dll?alias=Beat Saber_Data\Managed\Unity.TextMeshPro.dll
+""UnityEngine.dll?alias=Beat Saber_Data\Managed\UnityEngine.dll
 ""UnityEngine.
 """CoreModule.dll?alias=Beat Saber_Data\Managed\UnityEngine.CoreModule.dll
-"""CoreModule.dll?alias=Beat Saber_Data\Managed\UnityEngine.PhysicsModule.dll
+"""PhysicsModule.dll?alias=Beat Saber_Data\Managed\UnityEngine.PhysicsModule.dll
+"""UI.dll?alias=Beat Saber_Data\Managed\UnityEngine.UI.dll
+"""UIElementsModule.dll?alias=Beat Saber_Data\Managed\UnityEngine.UIElementsModule.dll
+"""UIModule.dll?alias=Beat Saber_Data\Managed\UnityEngine.UIModule.dll
+"""VRModule.dll?alias=Beat Saber_Data\Managed\UnityEngine.VRModule.dll
 ""Zenject.dll?alias=Beat Saber_Data\Managed\Zenject.dll
 ""Zenject-usage.dll?alias=Beat Saber_Data\Managed\Zenject-usage.dll
 
 "Libs/
 ""0Harmony.dll?alias=Libs\0Harmony.dll
+""Hive.Versioning.dll?alias=Libs\Hive.Versioning.dll
 
 ::startopt
 "::resolveInHere Libs/

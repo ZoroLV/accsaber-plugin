@@ -1,5 +1,6 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using AccSaber.LeaderboardSources;
 using AccSaber.Managers;
@@ -18,6 +19,7 @@ namespace AccSaber.UI.ViewControllers
 	internal sealed class AccSaberLeaderboardViewController : BSMLAutomaticViewController, IInitializable, IDisposable
 	{
 		private int _pageNumber = 0;
+		private int _scoreRequestVersion;
 		private int _selectedCellIndex;
 		private List<Button>? _infoButtons;
 		private LoadingControl? _loadingControl;
@@ -28,8 +30,8 @@ namespace AccSaber.UI.ViewControllers
 		private LeaderboardUserModalController _leaderboardUserModalController = null!;
 
 		[Inject]
-        public void Construct(AccSaberStore accSaberStore, List<ILeaderboardSource> leaderboardSources, WhereScoreModalController whereScoreModalController, LeaderboardUserModalController leaderboardUserModalController)
-        {
+		public void Construct(AccSaberStore accSaberStore, List<ILeaderboardSource> leaderboardSources, WhereScoreModalController whereScoreModalController, LeaderboardUserModalController leaderboardUserModalController)
+		{
 			_accSaberStore = accSaberStore;
 			_leaderboardSources = leaderboardSources;
 			_whereScoreModalController = whereScoreModalController;
@@ -38,10 +40,10 @@ namespace AccSaber.UI.ViewControllers
 
 		[UIComponent("leaderboard")]
 		private readonly LeaderboardTableView? _leaderboard = null!;
-		
+
 		[UIComponent("vertical-icon-segments")]
 		private readonly IconSegmentedControl? _iconSegmentedControl = null!;
-		
+
 		#region Info Buttons
 
 		// Maybe get around to making a custom leaderboard and get rid of this misery
@@ -76,7 +78,7 @@ namespace AccSaber.UI.ViewControllers
 		private readonly Button? _button10 = null!;
 
 		#endregion
-		
+
 		[UIObject("no-score-button")]
 		private readonly GameObject _noScoreButton = null!;
 
@@ -89,31 +91,23 @@ namespace AccSaber.UI.ViewControllers
 				PageNumber = 0;
 			}
 		}
-		
+
 		private int PageNumber
 		{
 			get => _pageNumber;
 			set
 			{
 				_pageNumber = value;
-				
-				if (_leaderboard is null || _loadingControl is null || _accSaberStore.CurrentRankedMap is null)
-				{
-					return;
-				}
-
-				_leaderboard.SetScores(new List<LeaderboardTableView.ScoreData>(), 0);
-				LeaderboardShowLoading();
-				_ = SetScores();
+				RefreshScores();
 			}
 		}
-		
+
 		[UIValue("up-enabled")]
 		private bool UpEnabled => PageNumber != 0 && _leaderboardSources[SelectedCellIndex].Scrollable;
 
 		[UIValue("down-enabled")]
-		private bool DownEnabled => _leaderboardSources[SelectedCellIndex].GetLatestCachedScore() is {Count: 10} && _leaderboardSources[SelectedCellIndex].Scrollable;
-		
+		private bool DownEnabled => _leaderboardSources[SelectedCellIndex].GetLatestCachedScore() is { Count: 10 } && _leaderboardSources[SelectedCellIndex].Scrollable;
+
 		[UIAction("#post-parse")]
 		private async Task PostParse()
 		{
@@ -122,9 +116,9 @@ namespace AccSaber.UI.ViewControllers
 			{
 				list.Add(new IconSegmentedControl.DataItem(await leaderboardSource.Icon, leaderboardSource.HoverHint));
 			}
-			
+
 			_iconSegmentedControl!.SetData(list.ToArray());
-			
+
 			// To set rich text, I have to iterate through all cells, set each cell to allow rich text and next time they will have it
 			var leaderboardTableCells = _leaderboard!.transform.GetComponentsInChildren<LeaderboardTableCell>(true);
 
@@ -132,7 +126,7 @@ namespace AccSaber.UI.ViewControllers
 			{
 				leaderboardTableCell.transform.Find("PlayerName").GetComponent<CurvedTextMeshPro>().richText = true;
 			}
-			
+
 			_loadingControl = _leaderboard.transform.GetComponentInChildren<LoadingControl>(true);
 
 			_infoButtons = new List<Button>(10);
@@ -156,7 +150,7 @@ namespace AccSaber.UI.ViewControllers
 				PageNumber--;
 			}
 		}
-		
+
 		[UIAction("down-clicked")]
 		private void DownClicked()
 		{
@@ -171,7 +165,7 @@ namespace AccSaber.UI.ViewControllers
 		{
 			SelectedCellIndex = index;
 		}
-		
+
 		#region Info Buttons Clicked
 		[UIAction("b-1-click")]
 		private void B1Clicked()
@@ -233,13 +227,13 @@ namespace AccSaber.UI.ViewControllers
 			InfoButtonClicked(9);
 		}
 		#endregion
-		
+
 		[UIAction("no-score-clicked")]
 		private void NoScoreClicked()
 		{
 			if (_leaderboard is null)
 				return;
-				
+
 			_whereScoreModalController.ShowModal(_leaderboard.transform);
 		}
 
@@ -248,12 +242,12 @@ namespace AccSaber.UI.ViewControllers
 			base.DidActivate(firstActivation, addedToHierarchy, screenSystemEnabling);
 
 			_ = await _accSaberStore.HasAccSaberUpdated();
-			
+
 			if (!firstActivation)
 			{
 				return;
 			}
-			
+
 			foreach (var leaderboardSource in _leaderboardSources)
 			{
 				leaderboardSource.ClearCache();
@@ -269,17 +263,32 @@ namespace AccSaber.UI.ViewControllers
 
 		private async Task SetScores(List<AccSaberLeaderboardEntry>? leaderboardEntries = null)
 		{
-			if (leaderboardEntries is null && _accSaberStore.CurrentRankedMap is not null)
+			var requestVersion = Volatile.Read(ref _scoreRequestVersion);
+			var rankedMap = _accSaberStore.CurrentRankedMap;
+			var selectedCellIndex = SelectedCellIndex;
+			var pageNumber = PageNumber;
+
+			if (leaderboardEntries is null && rankedMap is not null)
 			{
-				leaderboardEntries = await _leaderboardSources[SelectedCellIndex].GetScoresAsync(_accSaberStore.CurrentRankedMap, page: PageNumber);
+				leaderboardEntries = await _leaderboardSources[selectedCellIndex].GetScoresAsync(rankedMap, page: pageNumber);
 			}
-			
+
+			if (requestVersion != Volatile.Read(ref _scoreRequestVersion))
+			{
+				return;
+			}
+
 			var scores = new List<LeaderboardTableView.ScoreData>();
 			var userScorePos = -1;
-			
+
 			_noScoreButton.SetActive(false);
-			
-			if (leaderboardEntries is null || leaderboardEntries.Count == 0)
+
+			if (rankedMap is null)
+			{
+				scores.Add(new LeaderboardTableView.ScoreData(0, "This map is not ranked on AccSaber Reloaded.", 0, false));
+				ToggleInfoButtons(false);
+			}
+			else if (leaderboardEntries is null || leaderboardEntries.Count == 0)
 			{
 				scores.Add(new LeaderboardTableView.ScoreData(0, "You haven't set a score on this leaderboard - <size=75%>(<color=#FFD42A>0%</color>)</size>", 0, false));
 				_noScoreButton.SetActive(true);
@@ -288,8 +297,13 @@ namespace AccSaber.UI.ViewControllers
 			else
 			{
 				var userInfo = await _accSaberStore.GetPlatformUserInfo();
+				if (requestVersion != Volatile.Read(ref _scoreRequestVersion))
+				{
+					return;
+				}
+
 				var userId = userInfo?.platformUserId;
-				
+
 				for (var i = 0; i < (leaderboardEntries.Count > 10 ? 10 : leaderboardEntries.Count); i++)
 				{
 					scores.Add(new LeaderboardTableView.ScoreData(leaderboardEntries[i].Score, $"<size=85%>{leaderboardEntries[i].PlayerName} - <size=75%>(<color=#FFD42A>{leaderboardEntries[i].Accuracy * 100:F2}%</color>)</size></size> - <size=75%> (<color=#00FFAE>{leaderboardEntries[i].AP:F2}<size=55%> AP</size></color>)</size>", leaderboardEntries[i].Rank, false));
@@ -310,33 +324,58 @@ namespace AccSaber.UI.ViewControllers
 
 			if (_loadingControl != null && _leaderboard != null)
 			{
-				_loadingControl?.Hide();
+				if (requestVersion != Volatile.Read(ref _scoreRequestVersion))
+				{
+					return;
+				}
+
+				_loadingControl.Hide();
 				_leaderboard.SetScores(scores, userScorePos);
 				NotifyPropertyChanged(nameof(UpEnabled));
 				NotifyPropertyChanged(nameof(DownEnabled));
 			}
 		}
 
+		private void RefreshScores()
+		{
+			Interlocked.Increment(ref _scoreRequestVersion);
+
+			if (_leaderboard is null || _loadingControl is null)
+			{
+				return;
+			}
+
+			if (_accSaberStore.CurrentRankedMap is null)
+			{
+				_ = SetScores(new List<AccSaberLeaderboardEntry>());
+				return;
+			}
+
+			_leaderboard.SetScores(new List<LeaderboardTableView.ScoreData>(), 0);
+			LeaderboardShowLoading();
+			_ = SetScores();
+		}
+
 		private void LeaderboardShowLoading()
 		{
-			if (_loadingControl == null || _infoButtons == null) 
+			if (_loadingControl == null || _infoButtons == null)
 				return;
-			
-			_loadingControl?.ShowLoading();
+
+			_loadingControl.ShowLoading();
 			ToggleInfoButtons(false);
 		}
 
 		private void ToggleInfoButtons(bool value)
 		{
-			if (_infoButtons == null) 
+			if (_infoButtons == null)
 				return;
-			
+
 			foreach (var button in _infoButtons)
 			{
 				button.gameObject.SetActive(value);
 			}
 		}
-		
+
 		private void ChangeButtonScale(Button button, float scale)
 		{
 			var buttonTransform = button.transform;
@@ -344,7 +383,7 @@ namespace AccSaber.UI.ViewControllers
 			buttonTransform.localScale = localScale * scale;
 			_infoButtons?.Add(button);
 		}
-		
+
 		private void InfoButtonClicked(int index)
 		{
 			if (_infoButtons is null)
@@ -352,12 +391,18 @@ namespace AccSaber.UI.ViewControllers
 				return;
 			}
 
-			var playerId = _leaderboardSources[SelectedCellIndex].GetCachedScore(PageNumber)?[index].PlayerId;
+			var cachedScores = _leaderboardSources[SelectedCellIndex].GetCachedScore(PageNumber);
+			if (cachedScores is null || cachedScores.Count <= index)
+			{
+				return;
+			}
+
+			var playerId = cachedScores[index].PlayerId;
 			if (playerId is null)
 			{
 				return;
 			}
-			
+
 			_leaderboardUserModalController.ShowModal(_infoButtons[index].transform, playerId);
 		}
 
@@ -367,7 +412,7 @@ namespace AccSaber.UI.ViewControllers
 			{
 				leaderboardSource.ClearCache();
 			}
-			
+
 			PageNumber = 0;
 		}
 
@@ -378,7 +423,7 @@ namespace AccSaber.UI.ViewControllers
 
 		private void AccSaberStoreOnOnUpdatedFromAccSaberAPI(bool obj)
 		{
-			PageNumber = 0;
+			RefreshScores();
 		}
 
 		public void Initialize()

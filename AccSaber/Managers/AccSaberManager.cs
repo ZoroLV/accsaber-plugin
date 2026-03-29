@@ -1,6 +1,8 @@
-using AccSaber.Utils;
-using SiraUtil.Logging;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 using LeaderboardCore.Interfaces;
+using SiraUtil.Logging;
 using Zenject;
 
 namespace AccSaber.Managers
@@ -8,31 +10,51 @@ namespace AccSaber.Managers
 	internal class AccSaberManager : INotifyLeaderboardSet
 	{
 		private readonly SiraLog _log;
-		private readonly WebUtils _webUtils;
 		private readonly AccSaberStore _accSaberStore;
 		private readonly BeatmapLevelsModel _beatmapLevelsModel;
-        
-		public AccSaberManager(SiraLog log, WebUtils webUtils, AccSaberStore accSaberStore, BeatmapLevelsModel beatmapLevelsModel)
+		private int _lookupVersion;
+
+		public AccSaberManager(SiraLog log, AccSaberStore accSaberStore, BeatmapLevelsModel beatmapLevelsModel)
 		{
 			_log = log;
-			_webUtils = webUtils;
 			_accSaberStore = accSaberStore;
 			_beatmapLevelsModel = beatmapLevelsModel;
 		}
-        
+
 		public void OnLeaderboardSet(BeatmapKey beatmapKey)
 		{
-			BeatmapLevel? level = _beatmapLevelsModel.GetBeatmapLevel(beatmapKey.levelId);
+			_ = HandleLeaderboardSetAsync(beatmapKey);
+		}
 
-            if (level is null)
+		private async Task HandleLeaderboardSetAsync(BeatmapKey beatmapKey)
+		{
+			try
 			{
-				return;
+				var lookupVersion = Interlocked.Increment(ref _lookupVersion);
+				BeatmapLevel? level = _beatmapLevelsModel.GetBeatmapLevel(beatmapKey.levelId);
+				if (level is null)
+				{
+					if (lookupVersion == _lookupVersion)
+					{
+						_accSaberStore.CurrentRankedMap = null;
+					}
+
+					return;
+				}
+
+				var hash = SongCore.Utilities.Hashing.ComputeCustomLevelHash(level);
+				var mapInfo = await _accSaberStore.GetRankedMapAsync(hash, beatmapKey.difficulty.ToString());
+				if (lookupVersion != _lookupVersion)
+				{
+					return;
+				}
+
+				_accSaberStore.CurrentRankedMap = mapInfo;
 			}
-
-			var hash = $"{SongCore.Utilities.Hashing.GetCustomLevelHash(level)}/{beatmapKey.difficulty}".ToLower();
-			var mapInfo = _accSaberStore.RankedMaps.TryGetValue(hash, out var ret) ? ret : null;
-
-			_accSaberStore.CurrentRankedMap = mapInfo;
+			catch (Exception ex)
+			{
+				_log.Critical(ex);
+			}
 		}
 	}
 }

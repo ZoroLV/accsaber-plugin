@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using AccSaber.Models;
+using AccSaber.Models.Reloaded;
 using AccSaber.Utils;
 using SiraUtil.Logging;
 using Zenject;
@@ -14,7 +15,8 @@ namespace AccSaber.Managers
 		private readonly SiraLog _log;
 		private readonly WebUtils _webUtils;
 		private readonly IPlatformUserModel _platformUserModel;
-		
+		private readonly SemaphoreSlim _userRefreshSemaphore = new(1, 1);
+
 		public event Action<AccSaberRankedMap?>? OnAccSaberRankedMapUpdated;
 		public event Action? OnUpdatingFromAccSaberAPI;
 		public event Action<bool>? OnUpdatedFromAccSaberAPI;
@@ -24,8 +26,8 @@ namespace AccSaber.Managers
 		private AccSaberUser _currentUserTrue = new();
 		private AccSaberUser _currentUserStandard = new();
 		private AccSaberUser _currentUserTech = new();
-		public  DateTime LastLocalUpdateTime { get; private set; } = DateTime.MinValue;
-		
+		public DateTime LastLocalUpdateTime { get; private set; } = DateTime.MinValue;
+
 		private AccSaberRankedMap? _currentRankedMap;
 
 		public AccSaberStore(SiraLog log, WebUtils webUtils, IPlatformUserModel platformUserModel)
@@ -41,7 +43,7 @@ namespace AccSaber.Managers
 			Standard,
 			Tech
 		}
-		
+
 		public AccSaberRankedMap? CurrentRankedMap
 		{
 			get => _currentRankedMap;
@@ -52,78 +54,82 @@ namespace AccSaber.Managers
 			}
 		}
 
-		private async Task<Dictionary<string, AccSaberRankedMap>> GetRankedMaps()
+		public async Task<AccSaberRankedMap?> GetRankedMapAsync(string songHash, string difficulty, CancellationToken cancellationToken = default)
 		{
-			var response = await _webUtils.GetAsync<List<AccSaberRankedMap>>("https://api.accsaber.com/ranked-maps/");
-			
-			if (response == null)
+			var lookupKey = AccSaberRankedMap.CreateLookupKey(songHash, difficulty);
+			if (RankedMaps.TryGetValue(lookupKey, out var cachedMap))
 			{
-				_log.Error("Failed to get ranked maps from AccSaber API");
-				return new Dictionary<string, AccSaberRankedMap>();
+				return cachedMap;
 			}
 
-			var rankedMaps = new Dictionary<string, AccSaberRankedMap>();
-			foreach (var map in response)
-			{
-				rankedMaps[$"{map.SongHash}/{map.Difficulty}".ToLower()] = map;
-			}
-
-			return rankedMaps;
-		}
-		
-		private async Task UpdateAccSaberInfo(DateTime? lastAPIUpdateTime = null)
-		{
-			OnUpdatingFromAccSaberAPI?.Invoke();
-
-			lastAPIUpdateTime ??= await GetLastApiUpdateTime();
-			LastLocalUpdateTime = lastAPIUpdateTime.Value;
-			
-			var platformUser = await GetPlatformUserInfo();
-			if (platformUser is null)
-			{
-				_log.Error("platformUser is null");
-				return;
-			}
-
-			var newOverall = await GetUserFromId(platformUser.platformUserId);
-			
-			// Check if the data fetched is the same as what we already have cached
-			// Saves us from calling the API three more times for the True, Standard and Tech user categories.
-			if (Math.Abs(newOverall.AP - _currentUserOverall.AP) < 0.01f)
-			{
-				OnUpdatedFromAccSaberAPI?.Invoke(false);
-				return;
-			}
-
-			_currentUserOverall = newOverall;
-			await Task.Delay(1000);
-			_currentUserTrue = await GetUserFromId(platformUser.platformUserId, AccSaberMapCategories.True);
-			await Task.Delay(1000);
-			_currentUserStandard = await GetUserFromId(platformUser.platformUserId, AccSaberMapCategories.Standard);
-			await Task.Delay(1000);
-			_currentUserTech = await GetUserFromId(platformUser.platformUserId, AccSaberMapCategories.Tech);
-			
-			OnUpdatedFromAccSaberAPI?.Invoke(true);
-		}
-		private async Task<DateTime> GetLastApiUpdateTime()
-		{
-			var response = await _webUtils.GetAsync("https://api.accsaber.com/status/last-update");
-
+			var response = await _webUtils.GetAsync<AccSaberReloadedMapResponse>(
+				AccSaberReloadedApi.GetMapByHash(songHash, difficulty),
+				cancellationToken,
+				allowNotFound: true);
 			if (response is null)
 			{
-				return DateTime.MinValue;
+				return null;
 			}
-			
-			// TODO: Replace this with ParseExact
-			// The format just doesn't want to work GRAHHH
-			/*_log.Error(await response.ReadAsStringAsync());
-			
-			const string format = "yyyy-MM-ddTHH:mm:ss.fffffffffZ";
-			var lastApiUpdate = DateTime.ParseExact("2024-12-29T14:57:56.827733630", "yyyy-MM-ddTHH:mm:ss.fffffffff", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal);*/
-			var lastApiUpdate = DateTime.Parse(await response.ReadAsStringAsync(), System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind);
-			return lastApiUpdate;
+
+			var rankedMap = AccSaberRankedMap.FromReloaded(response, difficulty);
+			if (rankedMap is null)
+			{
+				return null;
+			}
+
+			RankedMaps[lookupKey] = rankedMap;
+			return rankedMap;
 		}
-		
+
+		private async Task<AccSaberReloadedUserResponse?> GetUserProfile(string id, CancellationToken cancellationToken = default)
+		{
+			return await _webUtils.GetAsync<AccSaberReloadedUserResponse>(AccSaberReloadedApi.GetUser(id), cancellationToken, allowNotFound: true);
+		}
+
+		private async Task<bool> UpdateAccSaberInfo()
+		{
+			await _userRefreshSemaphore.WaitAsync();
+			try
+			{
+				OnUpdatingFromAccSaberAPI?.Invoke();
+
+				var platformUser = await GetPlatformUserInfo();
+				if (platformUser is null)
+				{
+					_log.Error("platformUser is null");
+					OnUpdatedFromAccSaberAPI?.Invoke(false);
+					return false;
+				}
+
+				var response = await GetUserProfile(platformUser.platformUserId);
+				if (response is null)
+				{
+					_log.Error($"Failed to get user {platformUser.platformUserId} from AccSaber Reloaded API");
+					OnUpdatedFromAccSaberAPI?.Invoke(false);
+					return false;
+				}
+
+				var newOverall = AccSaberUser.FromReloaded(response);
+				var newTrue = AccSaberUser.FromReloaded(response, AccSaberMapCategories.True);
+				var newStandard = AccSaberUser.FromReloaded(response, AccSaberMapCategories.Standard);
+				var newTech = AccSaberUser.FromReloaded(response, AccSaberMapCategories.Tech);
+				var isUpdated = LastLocalUpdateTime == DateTime.MinValue || HasUserChanged(_currentUserOverall, newOverall);
+
+				_currentUserOverall = newOverall;
+				_currentUserTrue = newTrue;
+				_currentUserStandard = newStandard;
+				_currentUserTech = newTech;
+				LastLocalUpdateTime = DateTime.UtcNow;
+
+				OnUpdatedFromAccSaberAPI?.Invoke(isUpdated);
+				return isUpdated;
+			}
+			finally
+			{
+				_userRefreshSemaphore.Release();
+			}
+		}
+
 		public Task<AccSaberUser> GetCurrentUser(AccSaberMapCategories? category = null)
 		{
 			return Task.FromResult(category switch
@@ -138,29 +144,18 @@ namespace AccSaber.Managers
 
 		public async Task<AccSaberUser> GetUserFromId(string id, AccSaberMapCategories? category = null)
 		{
-			AccSaberUser? response;
-			if (category is null)
-			{
-				response = await _webUtils.GetAsync<AccSaberUser>($"https://api.accsaber.com/players/{id}");
-			}
-			else
-			{
-				response = await _webUtils.GetAsync<AccSaberUser>($"https://api.accsaber.com/players/{id}/{category.ToString().ToLower()}");
-			}
-
+			var response = await GetUserProfile(id);
 			if (response != null)
 			{
-				return response;
+				return AccSaberUser.FromReloaded(response, category);
 			}
 
-			_log.Error($"Failed to get user {id} from AccSaber API");
+			_log.Error($"Failed to get user {id} from AccSaber Reloaded API");
 			return new AccSaberUser();
-
 		}
 
 		public async Task<UserInfo?> GetPlatformUserInfo()
 		{
-			// GetUserInfo caches the result, no need to do it ourselves
 			return await _platformUserModel.GetUserInfo(CancellationToken.None);
 		}
 
@@ -174,7 +169,7 @@ namespace AccSaber.Managers
 				_ => await GetCurrentUser()
 			};
 		}
-		
+
 		public AccSaberUser GetCurrentCategoryUser()
 		{
 			return _currentRankedMap?.Category switch
@@ -186,28 +181,32 @@ namespace AccSaber.Managers
 			};
 		}
 
+		public AccSaberUser GetCurrentOverallUser()
+		{
+			return _currentUserOverall;
+		}
+
 		public async Task<bool> HasAccSaberUpdated()
 		{
-			// AccSaber updates every 30 minutes~, so no need to check if we know it updated say 5 minutes ago
-			if (DateTime.UtcNow < LastLocalUpdateTime.AddMinutes(15))
-			{
-				return false;
-			}
-			
-			var lastApiUpdate = await GetLastApiUpdateTime();
-			
-			if (lastApiUpdate <= LastLocalUpdateTime)
+			if (LastLocalUpdateTime != DateTime.MinValue && DateTime.UtcNow < LastLocalUpdateTime.AddMinutes(15))
 			{
 				return false;
 			}
 
-			await UpdateAccSaberInfo(lastApiUpdate);
-			return true;
+			return await UpdateAccSaberInfo();
 		}
-		
-		public async void Initialize()
+
+		public void Initialize()
 		{
-			RankedMaps = await GetRankedMaps();
+		}
+
+		private static bool HasUserChanged(AccSaberUser current, AccSaberUser next)
+		{
+			return !string.Equals(current.PlayerId, next.PlayerId, StringComparison.Ordinal) ||
+			       !string.Equals(current.PlayerName, next.PlayerName, StringComparison.Ordinal) ||
+			       current.Rank != next.Rank ||
+			       Math.Abs(current.AP - next.AP) > 0.01f ||
+			       current.RankedPlays != next.RankedPlays;
 		}
 	}
 }

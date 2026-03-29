@@ -1,5 +1,25 @@
-# AccSaber-Plugin
-Plugin for the AccSaber leaderboards
+# AccSaber Plugin
+Beat Saber plugin for AccSaber leaderboards.
+
+## Compatibility
+This fork targets Beat Saber `1.40.8`.
+It uses the AccSaber Reloaded API at `https://api.accsaberreloaded.com/v1` instead of the legacy `https://api.accsaber.com` endpoints.
+
+Minimum runtime dependencies for this branch:
+* `BSIPA` `4.3.6+`
+* `BeatSaberMarkupLanguage` `1.12.5+`
+* `SiraUtil` `3.2.1+`
+* `LeaderboardCore` `1.7.0+`
+* `SongCore` `3.15.3+`
+* `ScoreSaber` `3.3.17+`
+
+## Current Behavior
+* The AccSaber tab stays visible even when the selected map is not ranked on AccSaber Reloaded.
+* Ranked map lookup is live by song hash and difficulty against AccSaber Reloaded.
+* Player cards use Reloaded profile data, including HMD when the API provides it.
+
+## Release Note
+Ported to Beat Saber `1.40.8` and migrated to the AccSaber Reloaded API.
 
 ## Reporting Issues
 * The best way to report issues is to click on the `Issues` tab at the top of the GitHub page. This allows any contributor to see the problem and attempt to fix it, and others with the same issue can contribute more information. **Please try the troubleshooting steps before reporting the issues listed there. Please only report issues after using the latest build, your problem may have already been fixed.**
@@ -11,14 +31,25 @@ Plugin for the AccSaber leaderboards
 
 ## Contributing
 Anyone can feel free to contribute bug fixes or enhancements to the AccSaber plugin! Fork, make your changes and pull request it!
+
 ### Building
-Visual Studio 2019 with the [BeatSaberModdingTools](https://github.com/Zingabopp/BeatSaberModdingTools) extension is the recommended development environment.
+Any recent Windows MSBuild environment that can build `.NET Framework 4.8` projects should work. `dotnet build` on Windows also works.
+
 1. Check out the repository
-2. Open `accsaber-plugin.sln`
-3. Right-click the `accsaber-plugin` project, go to `Beat Saber Modding Tools` -> `Set Beat Saber Directory`
+2. Set `BeatSaberDir` to a valid Beat Saber `1.40.8` install, or provide extracted refs in `Refs`
+3. Build `AccSaber.sln`
+
+Example `dotnet` build:
+```powershell
+dotnet build .\AccSaber.sln -c Release /p:BeatSaberDir="C:\Path\To\Beat Saber"
+```
+
+If you prefer Visual Studio:
+1. Open `AccSaber.sln`
+2. Right-click the `AccSaber` project, go to `Beat Saber Modding Tools` -> `Set Beat Saber Directory`
   * This assumes you have already set the directory for your Beat Saber game folder in `Extensions` -> `Beat Saber Modding Tools` -> `Settings...`
-  * If you do not have the BeatSaberModdingTools extension, you will need to manually create a `accsaber-plugin.csproj.user` file to set the location of your game install. An example is showing below.
-4. The project should now build.
+  * If you do not have the BeatSaberModdingTools extension, you will need to manually create an `AccSaber.csproj.user` file to set the location of your game install. An example is showing below.
+3. The project should now build.
 
 **Example csproj.user File:**
 ```xml
@@ -29,5 +60,6 @@ Visual Studio 2019 with the [BeatSaberModdingTools](https://github.com/Zingabopp
   </PropertyGroup>
 </Project>
 ```
+
 ## License
 This project is licensed under the GNU GPL v3.0 License - see the [LICENSE](LICENSE) file for details.

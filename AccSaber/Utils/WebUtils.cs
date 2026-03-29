@@ -33,7 +33,7 @@ namespace AccSaber.Utils
             }
         }
 
-        internal async Task<T?> GetAsync<T>(string url, CancellationToken cancellationToken = default)
+        internal async Task<T?> GetAsync<T>(string url, CancellationToken cancellationToken = default, bool allowNotFound = false)
         {
             try
             {
@@ -44,7 +44,7 @@ namespace AccSaber.Utils
                     return default;
                 }
 
-                var parsed = await ParseWebResponse<T>(response);
+                var parsed = await ParseWebResponse<T>(response, allowNotFound);
                 return parsed;
             }
             catch (TaskCanceledException)
@@ -53,10 +53,15 @@ namespace AccSaber.Utils
             }
         }
 
-        private async Task<T?> ParseWebResponse<T>(IHttpResponse webResponse)
+        private async Task<T?> ParseWebResponse<T>(IHttpResponse webResponse, bool allowNotFound = false)
         {
             if (!webResponse.Successful)
             {
+                if (allowNotFound && webResponse.Code == 404)
+                {
+                    return default;
+                }
+
                 _log.Error($"Unsuccessful web response for parsing {typeof(T)}. Status code: {webResponse.Code}");
                 return default;
             }

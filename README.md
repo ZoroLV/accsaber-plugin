@@ -1,7 +1,8 @@
 # AccSaber Plugin
-Beat Saber plugin for AccSaber leaderboards.
+Beat Saber PC plugin for AccSaber leaderboards.
 
 ## Compatibility
+This is a Beat Saber PC mod. It does not target Quest standalone.
 This fork targets Beat Saber `1.40.8`.
 It uses the AccSaber Reloaded API at `https://api.accsaberreloaded.com/v1` instead of the legacy `https://api.accsaber.com` endpoints.
 

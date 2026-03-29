@@ -4,7 +4,7 @@
   "name": "AccSaber",
   "author": "AccSaber Team",
   "version": "1.1.0",
-  "description": "AccSaber Reloaded leaderboard plugin",
+  "description": "AccSaber Reloaded leaderboard plugin for Beat Saber PC",
   "gameVersion": "1.40.8",
   "dependsOn": {
     "BSIPA": "^4.3.6",

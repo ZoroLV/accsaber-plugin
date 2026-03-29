@@ -3,7 +3,7 @@ Beat Saber PC plugin for AccSaber leaderboards.
 
 ## Compatibility
 This is a Beat Saber PC mod. It does not target Quest standalone.
-This fork targets Beat Saber `1.40.8`.
+Exact Beat Saber compatibility is documented per release.
 It uses the AccSaber Reloaded API at `https://api.accsaberreloaded.com/v1` instead of the legacy `https://api.accsaber.com` endpoints.
 
 Minimum runtime dependencies for this branch:
@@ -17,9 +17,6 @@ Minimum runtime dependencies for this branch:
 * The AccSaber tab stays visible even when the selected map is not ranked on AccSaber Reloaded.
 * Ranked map lookup is live by song hash and difficulty against AccSaber Reloaded.
 * Player cards use Reloaded profile data, including HMD when the API provides it.
-
-## Release Note
-Ported to Beat Saber `1.40.8` and migrated to the AccSaber Reloaded API.
 
 ## Reporting Issues
 * The best way to report issues is to click on the `Issues` tab at the top of the GitHub page. This allows any contributor to see the problem and attempt to fix it, and others with the same issue can contribute more information. **Please try the troubleshooting steps before reporting the issues listed there. Please only report issues after using the latest build, your problem may have already been fixed.**
@@ -36,7 +33,7 @@ Anyone can feel free to contribute bug fixes or enhancements to the AccSaber plu
 Any recent Windows MSBuild environment that can build `.NET Framework 4.8` projects should work. `dotnet build` on Windows also works.
 
 1. Check out the repository
-2. Set `BeatSaberDir` to a valid Beat Saber `1.40.8` install, or provide extracted refs in `Refs`
+2. Set `BeatSaberDir` to a valid supported Beat Saber PC install, or provide extracted refs in `Refs`
 3. Build `AccSaber.sln`
 
 Example `dotnet` build:

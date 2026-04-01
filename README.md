@@ -6,17 +6,12 @@ This is a Beat Saber PC mod. It does not target Quest standalone.
 Exact Beat Saber compatibility is documented per release.
 It uses the AccSaber Reloaded API at `https://api.accsaberreloaded.com/v1` instead of the legacy `https://api.accsaber.com` endpoints.
 
-Minimum runtime dependencies for this branch:
+Minimum runtime dependencies:
 * `BSIPA` `4.3.6+`
 * `BeatSaberMarkupLanguage` `1.12.5+`
 * `SiraUtil` `3.2.1+`
 * `LeaderboardCore` `1.7.0+`
 * `SongCore` `3.15.3+`
-
-## Current Behavior
-* The AccSaber tab stays visible even when the selected map is not ranked on AccSaber Reloaded.
-* Ranked map lookup is live by song hash and difficulty against AccSaber Reloaded.
-* Player cards use Reloaded profile data, including HMD when the API provides it.
 
 ## Reporting Issues
 * The best way to report issues is to click on the `Issues` tab at the top of the GitHub page. This allows any contributor to see the problem and attempt to fix it, and others with the same issue can contribute more information. **Please try the troubleshooting steps before reporting the issues listed there. Please only report issues after using the latest build, your problem may have already been fixed.**

@@ -1,3 +1,13 @@
+# ⚠️ This Repository is Archived
+
+This project is no longer actively maintained or monitored. 
+Existing code remains available for historical reference and fork usage.
+
+* **Official Plugin:** Please visit https://github.com/not-dexter/accsaber-reloaded-plugin for AccSaber Reloaded's plugin.
+  
+
+
+
 # AccSaber Plugin
 Beat Saber PC plugin for AccSaber leaderboards.
 
